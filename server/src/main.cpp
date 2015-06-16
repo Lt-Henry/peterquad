@@ -2,15 +2,20 @@
 
 
 #include <iostream>
+#include <stdexcept>
 
+#include <sys/socket.h>
+#include <arpa/inet.h>
 
 using namespace std;
 
 int main(int argc,char * argv[])
 {
 	int socket_fd, client_fd;
-	int cli_len;
+	socklen_t cli_len;
 	struct sockaddr_in server, client;
+	char data[32];
+	int data_len;
 	
 	socket_fd = socket(AF_INET , SOCK_STREAM , 0);
 	
@@ -38,6 +43,22 @@ int main(int argc,char * argv[])
 	if(client_fd<0)
 	{
 		throw runtime_error("Accept failed");
+	}
+	
+	
+	while(true)
+	{
+		data_len=recv(client_fd,data,32,0);
+		
+		if(data_len<=0)
+			throw runtime_error("Connection lost");
+		
+		cout<<" Data: "<<endl;
+		for(int n=0;n<data_len;n++)
+		{
+			cout<<hex<<(int)data[n]<<endl;
+		}
+		cout<<endl;
 	}
 	
 	return 0;
