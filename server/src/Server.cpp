@@ -7,6 +7,7 @@
 #include <thread>
 #include <chrono>
 
+#include <fcntl.h>
 
 
 using namespace std;
@@ -34,41 +35,78 @@ void Server::NetworkThread()
 	char data[512];
 	int data_len;
 	
-	socket_fd = socket(AF_INET , SOCK_STREAM , 0);
-	
-	if(socket_fd==-1)throw runtime_error("Could not create socket");
-	
-	server.sin_family = AF_INET;
-	server.sin_addr.s_addr = INADDR_ANY;
-	server.sin_port = htons(Server::port);
-	
-	if( bind(socket_fd,(struct sockaddr *)&server , sizeof(server)) < 0)
-		throw runtime_error("Bind failed");
-		
-	listen(socket_fd , 1);
-	
-	cli_len=sizeof(client);
-	
-	client_fd=accept(socket_fd,(struct sockaddr *) &client,&cli_len);
-	
-	if(client_fd<0)
-	{
-		throw runtime_error("Accept failed");
-	}
-	
-	connected=true;
-	
 	while(!quit_request)
 	{
-		data_len=recv(client_fd,data,32,0);
-		
-		if(data_len<=0)
-			throw runtime_error("Connection lost");
+		try
+		{
+			cout<<"stage 1"<<endl;
+			socket_fd = socket(AF_INET , SOCK_STREAM , 0);
+			if(socket_fd==-1)throw runtime_error("Could not create socket");
+			
+			server.sin_family = AF_INET;
+			server.sin_addr.s_addr = INADDR_ANY;
+			server.sin_port = htons(Server::port);
+	
+			cout<<"stage 2"<<endl;
+			if(bind(socket_fd,(struct sockaddr *)&server,sizeof(server)) < 0)
+				throw runtime_error("Bind failed");
+				
+			cout<<"stage 3"<<endl;
+			listen(socket_fd , 1);
+	
+			cli_len=sizeof(client);
+			
+			fcntl(socket_fd, F_SETFL, fcntl(socket_fd, F_GETFL, 0) | O_NONBLOCK);
+			cout<<"stage 4"<<endl;
+			//wait-loop for an incoming connection
+			while(true)
+			{
+				client_fd=accept4(socket_fd,(struct sockaddr *) &client,&cli_len,SOCK_NONBLOCK);
+				
+				
+				if(client_fd>0)
+					break;
+				else
+				{
+					//non blocking accept, wait 100ms and try again
+					if(errno==EWOULDBLOCK)
+					{
+						std::this_thread::sleep_for(std::chrono::milliseconds(100));
+						cout<<"waiting..."<<endl;
+					}
+					else
+						throw runtime_error("Accept failed");
+				}
+				
+				if(quit_request)
+					throw runtime_error("Quit requested");
+			}
+			
+			
+			
+			
+			connected=true;
+			
+			while(!quit_request)
+			{
+				data_len=recv(client_fd,data,32,0);
+				if(data_len<=0)
+					throw runtime_error("Connection lost");
+			}
+			
+			connected=false;
+			
+		}
+		catch(runtime_error & e)
+		{
+			connected=false;
+			cerr<<e.what()<<endl;
+			std::this_thread::sleep_for(std::chrono::milliseconds(1000));
+		}
 	}
 	
-	close(socket_fd);
 	
-	connected=false;
+	
 }
 
 void Server::Run()
