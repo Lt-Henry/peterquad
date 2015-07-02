@@ -33,9 +33,24 @@ namespace com
 				void NetworkThread();
 				
 				/*!
+				 Read thread
+				*/
+				void RxThread();
+				
+				/*!
+				 Write Thread
+				*/
+				void TxThread();
+				
+				/*!
 				 Pilot main thread
 				*/
 				void Run();
+				
+				/*!
+				 Quit
+				*/
+				void Quit();
 			};
 		}
 	}
