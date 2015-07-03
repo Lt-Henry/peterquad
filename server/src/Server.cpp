@@ -8,6 +8,7 @@
 #include <chrono>
 
 #include <fcntl.h>
+#include <unistd.h>
 
 
 using namespace std;
@@ -34,30 +35,44 @@ void Server::NetworkThread()
 	struct sockaddr_in server, client;
 	char data[512];
 	int data_len;
+	int watchdog=0;
+	
+	try
+	{
+		cout<<"stage 1"<<endl;
+		socket_fd = socket(AF_INET , SOCK_STREAM , 0);
+		if(socket_fd==-1)throw runtime_error("Could not create socket");
+
+		server.sin_family = AF_INET;
+		server.sin_addr.s_addr = INADDR_ANY;
+		server.sin_port = htons(Server::port);
+
+		cout<<"stage 2"<<endl;
+		if(bind(socket_fd,(struct sockaddr *)&server,sizeof(server)) < 0)
+			throw runtime_error("Bind failed");
+
+		cout<<"stage 3"<<endl;
+		listen(socket_fd , 1);
+
+		cli_len=sizeof(client);
+
+		fcntl(socket_fd, F_SETFL, fcntl(socket_fd, F_GETFL, 0) | O_NONBLOCK);
+		cout<<"stage 4"<<endl;
+	}
+	catch(runtime_error & e)
+	{
+		close(socket_fd);
+		cerr<<e.what()<<endl;
+		cerr<<"errno:"<<errno<<endl;
+		cerr<<"Failed to create a socket"<<endl;
+		return;
+	}
 
 	while(!quit_request)
 	{
 		try
 		{
-			cout<<"stage 1"<<endl;
-			socket_fd = socket(AF_INET , SOCK_STREAM , 0);
-			if(socket_fd==-1)throw runtime_error("Could not create socket");
-
-			server.sin_family = AF_INET;
-			server.sin_addr.s_addr = INADDR_ANY;
-			server.sin_port = htons(Server::port);
-
-			cout<<"stage 2"<<endl;
-			if(bind(socket_fd,(struct sockaddr *)&server,sizeof(server)) < 0)
-				throw runtime_error("Bind failed");
-
-			cout<<"stage 3"<<endl;
-			listen(socket_fd , 1);
-
-			cli_len=sizeof(client);
-
-			fcntl(socket_fd, F_SETFL, fcntl(socket_fd, F_GETFL, 0) | O_NONBLOCK);
-			cout<<"stage 4"<<endl;
+			
 			//wait-loop for an incoming connection
 			while(true)
 			{
@@ -83,14 +98,36 @@ void Server::NetworkThread()
 			}
 
 
-
+			fcntl(client_fd, F_SETFL, fcntl(client_fd, F_GETFL, 0) | O_NONBLOCK);
 			connected=true;
 
 			while(!quit_request)
 			{
 				data_len=recv(client_fd,data,32,0);
-				if(data_len<=0)
-					throw runtime_error("Connection lost");
+				if(data_len>0)
+				{
+					watchdog=0;
+					for(int n=0;n<data_len;n++)
+					{
+						cout<<hex<<(int)data[n]<<endl;
+					}
+				}
+				else
+				{
+					if(errno==EWOULDBLOCK)
+					{
+						watchdog+=10;
+						std::this_thread::sleep_for(std::chrono::milliseconds(10));
+					}
+					else
+						throw runtime_error("Connection lost");
+				}
+				
+				if(watchdog>10000)
+				{
+					throw runtime_error("Connection timeout");
+				}
+					
 			}
 
 			connected=false;
@@ -99,45 +136,26 @@ void Server::NetworkThread()
 		catch(runtime_error & e)
 		{
 			connected=false;
+			close(client_fd);
 			cerr<<e.what()<<endl;
 			std::this_thread::sleep_for(std::chrono::milliseconds(1000));
 		}
 	}
 
 
-
+	close(socket_fd);
 }
 
 
-void Server::RxThread()
-{
-	while(!quit_request)
-	{
 
-		std::this_thread::sleep_for(std::chrono::milliseconds(10));
-	}
-}
-
-void Server::TxThread()
-{
-	while(!quit_request)
-	{
-
-		std::this_thread::sleep_for(std::chrono::milliseconds(10));
-	}
-}
 
 
 void Server::Run()
 {
 	thread tnetwork;
-	thread ttx;
-	thread trx;
 
 	cout<<"* spawning network threads"<<endl;
 	tnetwork = thread(&Server::NetworkThread,this);
-	ttx = thread(&Server::TxThread,this);
-	trx = thread(&Server::RxThread,this);
 
 	cout<<"* server ready"<<endl;
 
@@ -149,8 +167,6 @@ void Server::Run()
 
 	cout<<"* closing server"<<endl;
 
-	ttx.join();
-	trx.join();
 	tnetwork.join();
 
 
