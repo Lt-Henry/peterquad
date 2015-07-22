@@ -8,10 +8,16 @@
 #include <sys/socket.h>
 #include <arpa/inet.h>
 
-
+#include <signal.h>
 
 using namespace std;
 
+bool quit_request=false;
+
+void handler(int s)
+{
+	quit_request=true;
+}
 
 int main(int argc,char * argv[])
 {
@@ -20,6 +26,8 @@ int main(int argc,char * argv[])
 	struct sockaddr_in server;
 	
 	char data[32];
+	
+	signal (SIGINT,handler);
 	
 	socket_fd = socket(AF_INET , SOCK_STREAM , 0);
 	
@@ -41,21 +49,21 @@ int main(int argc,char * argv[])
 	
 	cout<<" done"<<endl;
 	
-	for(int n=0;n<32;n++)
-	{
-		data[n]=n<<2;
-	}
+	data[0]=0;//status request
 	
-	while(true)
+	while(!quit_request)
 	{
 	
-		if( send(socket_fd , data , 32 , 0) < 0)
+		if( send(socket_fd , data , 1 , 0) < 0)
 		{
 			throw runtime_error("Failed to send message");
 		}
 	
 		std::this_thread::sleep_for(std::chrono::milliseconds(1000));
 	}
-
+	
+	data[0]=2; //quit request
+	send(socket_fd , data , 1 , 0);
+	
 	return 0;
 }

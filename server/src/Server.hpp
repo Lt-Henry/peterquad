@@ -6,15 +6,39 @@
 #include <sys/socket.h>
 #include <arpa/inet.h>
 
+#include <vector>
+#include <mutex>
+
+#define CMD_STATUS_REQUEST	0
+#define CMD_STATUS	1
+#define CMD_QUIT_REQUEST	2
+
 namespace com
 {
 	namespace toxiclabs
 	{
 		namespace peterquad
 		{
+		
+			struct Command
+			{
+				union
+				{
+					char data[32];
+					struct
+					{
+						char type;
+						
+					};
+				};
+			};
+			
 			class Server
 			{
 				public:
+				
+				std::mutex cmdMutex;
+				std::vector<Command> incomingCommands;
 				
 				/*! request for exit */
 				bool quit_request;
@@ -26,6 +50,8 @@ namespace com
 				
 				Server();
 				~Server();
+				
+				void ProcessCommand(char * data,int len);
 				
 				/*!
 				 Network management thread

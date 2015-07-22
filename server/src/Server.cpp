@@ -33,7 +33,7 @@ void Server::NetworkThread()
 	int socket_fd, client_fd;
 	socklen_t cli_len;
 	struct sockaddr_in server, client;
-	char data[512];
+	char data[32];
 	int data_len;
 	int watchdog=0;
 	
@@ -107,10 +107,7 @@ void Server::NetworkThread()
 				if(data_len>0)
 				{
 					watchdog=0;
-					for(int n=0;n<data_len;n++)
-					{
-						cout<<hex<<(int)data[n]<<endl;
-					}
+					ProcessCommand(data,data_len);
 				}
 				else
 				{
@@ -147,12 +144,34 @@ void Server::NetworkThread()
 }
 
 
+void Server::ProcessCommand(char * data,int len)
+{
+	Command c;
+	
+	for(int n=0;n<len;n++)
+	{
+		c.data[n]=data[n];
+	}
+	
+	cmdMutex.lock();
+	if(incomingCommands.size()<1024)
+	{
+		incomingCommands.push_back(c);
+	}
+	else
+	{
+		cerr<<"Command stack is full!"<<endl;
+	}
+	cmdMutex.unlock();
+}
 
 
 
 void Server::Run()
 {
 	thread tnetwork;
+	bool incmd;
+	Command cmd;
 
 	cout<<"* spawning network threads"<<endl;
 	tnetwork = thread(&Server::NetworkThread,this);
@@ -161,7 +180,30 @@ void Server::Run()
 
 	while(!quit_request)
 	{
-
+		incmd=false;
+		cmdMutex.lock();
+		if(!incomingCommands.empty())
+		{
+			incmd=true;
+			cmd=incomingCommands.back();
+			incomingCommands.pop_back();
+		}
+		cmdMutex.unlock();
+		
+		if(incmd)
+		{
+			switch(cmd.type)
+			{
+				case CMD_STATUS_REQUEST:
+					cout<<"status command"<<endl;
+				break;
+				
+				case CMD_QUIT_REQUEST:
+					Quit();
+				break;
+			}
+		}
+		
 		std::this_thread::sleep_for(std::chrono::milliseconds(10));
 	}
 

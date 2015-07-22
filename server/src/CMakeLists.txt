@@ -1,5 +1,5 @@
 
-add_executable(peterquad-server main.cpp Server.cpp)
+add_executable(peterquad-server main.cpp Server.cpp System.cpp)
 
 target_link_libraries(peterquad-server pthread)
 
