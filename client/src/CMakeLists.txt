@@ -1,12 +1,12 @@
 
-add_executable(peterquad-client main.cpp)
+add_executable(peterquad-client main.cpp Client.cpp)
 
-#find_package(PkgConfig REQUIRED)
-#pkg_check_modules(GLIBMM REQUIRED glibmm-2.4)
+find_package(PkgConfig REQUIRED)
+pkg_check_modules(GTKMM REQUIRED gtkmm-3.0)
 
-#target_link_libraries(mrpdi-calibrator ${GLIBMM_LIBRARIES} ${GIOMM_LIBRARIES} ${GTKMM_LIBRARIES} X11 Xi)
+target_link_libraries(peterquad-client ${GTKMM_LIBRARIES})
 
-#include_directories(${GLIBMM_INCLUDE_DIRS} ${GIOMM_INCLUDE_DIRS} ${GTKMM_INCLUDE_DIRS})
+include_directories(${GTKMM_INCLUDE_DIRS})
 
 add_definitions(-std=c++11 -g -O2)
 

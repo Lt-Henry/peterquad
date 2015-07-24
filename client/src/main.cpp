@@ -1,4 +1,5 @@
 
+#include "Client.hpp"
 
 #include <iostream>
 #include <stdexcept>
@@ -11,14 +12,20 @@
 #include <signal.h>
 
 using namespace std;
+using namespace com::toxiclabs::peterquad;
 
-bool quit_request=false;
-
-void handler(int s)
+int main (int argc,char * argv[])
 {
-	quit_request=true;
+
+
+	Client client(argc,argv);
+	client.Run();
+
+	
+	return 0;
 }
 
+/*
 int main(int argc,char * argv[])
 {
 
@@ -66,4 +73,4 @@ int main(int argc,char * argv[])
 	send(socket_fd , data , 1 , 0);
 	
 	return 0;
-}
+}*/
